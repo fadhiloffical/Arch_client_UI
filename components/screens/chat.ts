@@ -145,7 +145,7 @@ export async function generateArchitectSummary(
       - Additional Notes & Feature Configurations:
       ${projectDetails.notes || "None"}
 
-      The JSON object must have two keys: "brief" and "dxfPlan".
+      The JSON object must have two keys: "brief" and "jsonPlan".
 
       For the "brief" value, create a comprehensive, highly professional "Requirement Analysis & Architectural Brief" text. Structure it with these sections:
         1. PROJECT OVERVIEW
@@ -154,15 +154,14 @@ export async function generateArchitectSummary(
         4. MATERIAL & TECHNICAL RECOMMENDATIONS
       Write this brief in ${language === 'ml' ? 'Malayalam' : 'English'}. Use uppercase for headings.
 
-      For the "dxfPlan" value, act as a Senior Architect and Civil Engineer. Generate a highly detailed and logical conceptual floor plan as a valid ASCII DXF (R12 compatible) file string.
-      - Deeply integrate ALL the provided "Client Details" (Styles, Bedrooms, Area, Budget, Key Features, and Additional Notes) into the creative spatial design.
-      - The total area of all rooms must logically fall within the user's specified range of ${projectDetails.sqftRange[0]} to ${projectDetails.sqftRange[1]} Sq.Ft.
-      - Arrange rooms based on expert architectural principles, Vastu Shastra (if implied by the Kerala context), and optimal circulation flow.
-      - Include specific distinct areas and boxes for the "Key Features" explicitly requested by the user.
-      - For each room and feature, use LINE entities to create accurate bounding boxes proportional to their expected sizes.
-      - Inside each box, use a TEXT entity for the room/feature name and another TEXT entity for its approximate dimensions (e.g., 'Master Bedroom' and '(14' x 16')').
-      - If the user selected 'Double Story', create separate logical groupings for 'GROUND FLOOR' and 'FIRST FLOOR' within the DXF plan, clearly labeled with TEXT entities.
-      - Ensure the output is a raw, valid ASCII DXF string, including HEADER, ENTITIES, and EOF sections, without any extra formatting or markdown.
+      For the "jsonPlan" value, act as a Senior Architect. Generate a structured JSON object representing a conceptual 2D floor plan. This object should contain:
+      - "viewBox": an object with "width" and "height" (e.g., { "width": 800, "height": 600 }).
+      - "rooms": an array of room objects for a single story plan.
+      - OR "groundFloor" and "firstFloor" arrays of room objects for a double story plan.
+      - Each room object must have: "id" (string), "name" (string), "x" (number), "y" (number), "width" (number), and "height" (number).
+      - The layout should be logical, with room adjacencies based on standard architectural principles.
+      - The dimensions and positions should be relative to the viewBox.
+      - The total area of the rooms should be proportional to the user's specified sqftRange.
     `;
 
     const result = await model.generateContent(prompt);
@@ -170,7 +169,7 @@ export async function generateArchitectSummary(
     responseText = responseText.replace(/```json/gi, '').replace(/```/g, '').trim();
     const parsed = JSON.parse(responseText);
 
-    return { brief: parsed.brief, dxfPlan: parsed.dxfPlan };
+    return { brief: parsed.brief, jsonPlan: parsed.jsonPlan };
   } catch (error: any) {
     console.error("AI Summary Error:", error);
     return { error: error.message || "Error generating architect summary." };

@@ -26,6 +26,22 @@ interface SummaryScreenProps {
   onSubmit: () => void
 }
 
+type PlanRoom = {
+  id: string;
+  name: string;
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+};
+
+type JsonPlan = {
+  viewBox: { width: number; height: number };
+  rooms?: PlanRoom[];
+  groundFloor?: PlanRoom[];
+  firstFloor?: PlanRoom[];
+};
+
 const styleLabels: Record<string, { en: string; ml: string }> = {
   traditional: { en: "Traditional Kerala", ml: "പരമ്പരാഗത കേരളം" },
   modern: { en: "Modern Minimalist", ml: "ആധുനിക മിനിമലിസ്റ്റ്" },
@@ -53,7 +69,7 @@ export function SummaryScreen({
 }: SummaryScreenProps) {
   const [architectBrief, setArchitectBrief] = useState<string>("")
   const [isLoadingBrief, setIsLoadingBrief] = useState(true)
-  const [dxfPlan, setDxfPlan] = useState<string>("")
+  const [jsonPlan, setJsonPlan] = useState<JsonPlan | null>(null)
   const [projectRef] = useState(`KL-${new Date().getFullYear()}-${Math.random().toString(36).substring(2, 8).toUpperCase()}`)
 
   useEffect(() => {
@@ -63,7 +79,7 @@ export function SummaryScreen({
       const res = await generateArchitectSummary({ styles, houseType, bhk, sqftRange, features: featureTitles, budgetRange, notes }, language)
       if (res.brief) {
         setArchitectBrief(res.brief);
-        setDxfPlan(res.dxfPlan || "");
+        setJsonPlan(res.jsonPlan || null);
       } else {
         const errorMsg = language === "en" ? "Failed to generate brief." : "സംഗ്രഹം സൃഷ്ടിക്കാൻ കഴിഞ്ഞില്ല.";
         setArchitectBrief(errorMsg);
@@ -118,16 +134,6 @@ export function SummaryScreen({
     }
 
     doc.save(`Requirement_Analysis_${projectRef}.pdf`);
-  }
-
-  const handleCadDownload = () => {
-    const element = document.createElement("a");
-    const file = new Blob([dxfPlan], {type: 'application/dxf'});
-    element.href = URL.createObjectURL(file);
-    element.download = `Conceptual_Plan_${projectRef}.dxf`;
-    document.body.appendChild(element);
-    element.click();
-    document.body.removeChild(element);
   }
 
   return (
@@ -316,21 +322,47 @@ export function SummaryScreen({
           )}
         </div>
 
-        {/* AI CAD Plan Section */}
-        {dxfPlan && !isLoadingBrief && (
+        {/* AI 2D Plan Section */}
+        {jsonPlan && !isLoadingBrief && (
           <div className="border border-border bg-card p-6 mt-6 relative">
-            <div className="flex flex-col items-center justify-center text-center p-4 border-2 border-dashed border-border rounded-md">
-              <Map className="w-8 h-8 text-primary mb-3" />
-              <h3 className="font-serif text-lg font-medium mb-1">
-                {language === "en" ? "Conceptual CAD Plan Generated" : "കൺസെപ്ച്വൽ CAD പ്ലാൻ തയ്യാറാണ്"}
-              </h3>
-              <p className="text-xs text-muted-foreground mb-4">
-                {language === "en" ? "A basic DXF file has been generated for your architect." : "നിങ്ങളുടെ ആർക്കിടെക്റ്റിനായി ഒരു അടിസ്ഥാന DXF ഫയൽ സൃഷ്ടിച്ചു."}
-              </p>
-              <button onClick={handleCadDownload} className="text-sm bg-primary text-primary-foreground px-4 py-2 rounded-md flex items-center gap-2 hover:bg-primary/90 transition-colors">
-                <Download className="w-4 h-4" />
-                {language === "en" ? "Download CAD (.dxf)" : "CAD ഡൗൺലോഡ് ചെയ്യുക (.dxf)"}
-              </button>
+            <h3 className="font-serif text-lg font-medium flex items-center gap-2 mb-4">
+              <Map className="w-5 h-5 text-primary" />
+              {language === "en" ? "Conceptual 2D Plan" : "കൺസെപ്ച്വൽ 2D പ്ലാൻ"}
+            </h3>
+            <div 
+              className="relative w-full bg-muted rounded-md aspect-video overflow-hidden"
+              style={{
+                aspectRatio: `${jsonPlan.viewBox.width} / ${jsonPlan.viewBox.height}`
+              }}
+            >
+              {(jsonPlan.rooms || jsonPlan.groundFloor)?.map((room) => (
+                <div
+                  key={room.id}
+                  className="absolute border border-primary/50 bg-primary/5 flex items-center justify-center text-center p-1"
+                  style={{
+                    left: `${(room.x / jsonPlan.viewBox.width) * 100}%`,
+                    top: `${(room.y / jsonPlan.viewBox.height) * 100}%`,
+                    width: `${(room.width / jsonPlan.viewBox.width) * 100}%`,
+                    height: `${(room.height / jsonPlan.viewBox.height) * 100}%`,
+                  }}
+                >
+                  <span className="text-[8px] md:text-[10px] text-primary/80 font-medium leading-tight">{room.name}</span>
+                </div>
+              ))}
+              {jsonPlan.firstFloor?.map((room) => (
+                 <div
+                  key={room.id}
+                  className="absolute border border-accent/50 bg-accent/5 flex items-center justify-center text-center p-1"
+                  style={{
+                    left: `${(room.x / jsonPlan.viewBox.width) * 100}%`,
+                    top: `${(room.y / jsonPlan.viewBox.height) * 100}%`,
+                    width: `${(room.width / jsonPlan.viewBox.width) * 100}%`,
+                    height: `${(room.height / jsonPlan.viewBox.height) * 100}%`,
+                  }}
+                >
+                  <span className="text-[8px] md:text-[10px] text-accent-foreground/80 font-medium leading-tight">{room.name}</span>
+                </div>
+              ))}
             </div>
           </div>
         )}

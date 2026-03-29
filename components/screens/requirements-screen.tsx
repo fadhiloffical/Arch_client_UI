@@ -52,8 +52,12 @@ function formatBudget(value: number): string {
   if (value >= 100) {
     return `${(value / 100).toFixed(1)}Cr`
   }
-  return `${value}L`
+  return `${value} Lakhs`
 }
+
+// Global in-memory caches to prevent duplicate API calls during the session
+const suggestionsCache = new Map<string, FeatureCategory[]>();
+const greetingCache = new Map<string, any>();
 
 export function RequirementsScreen({
   language,
@@ -93,6 +97,15 @@ export function RequirementsScreen({
   React.useEffect(() => {
     async function fetchFeatures() {
       setIsLoadingFeatures(true);
+      
+      // 1. Local Cache Check for Feature Suggestions
+      const cacheKey = `${language}-${[...selectedStyles].sort().join('-')}`;
+      if (suggestionsCache.has(cacheKey)) {
+        setFeatureCategories(suggestionsCache.get(cacheKey)!);
+        setIsLoadingFeatures(false);
+        return;
+      }
+
       const result = await getAIFeatureSuggestions(selectedStyles, styleNotes, language);
 
       if (result.suggestions) {
@@ -105,6 +118,7 @@ export function RequirementsScreen({
           })),
         }));
         setFeatureCategories(categoriesWithIcons);
+        suggestionsCache.set(cacheKey, categoriesWithIcons); // Save to local cache
       } else {
         console.error("Failed to load AI features:", result.error);
         setFeatureCategories([]);
@@ -112,7 +126,7 @@ export function RequirementsScreen({
       setIsLoadingFeatures(false);
     }
 
-    // fetchFeatures();
+    fetchFeatures();
   }, [selectedStyles, language]);
 
   React.useEffect(() => {
@@ -122,6 +136,15 @@ export function RequirementsScreen({
 
       const fetchInitialGreeting = async () => {
         try {
+          // 2. Local Cache Check for Initial Chat Greetings
+          const cacheKey = `${language}-${activeFeatureObj.id}`;
+          if (greetingCache.has(cacheKey)) {
+            const cachedGreeting = greetingCache.get(cacheKey);
+            setChatMessages([cachedGreeting]);
+            setIsTyping(false);
+            return;
+          }
+
           const promptMessage = language === "en" 
             ? `I want to add a ${activeFeatureObj.title} to my home. What are the best options or styles for this feature?` 
             : `ഞാൻ ${activeFeatureObj.titleMl} തിരഞ്ഞെടുത്തിട്ടുണ്ട്. ഇതിന്റെ പ്രധാന ഓപ്ഷനുകൾ എന്തൊക്കെയാണ്?`;
@@ -129,7 +152,9 @@ export function RequirementsScreen({
           const data = await getAIResponse(promptMessage, activeFeatureObj.title, language);
           
           if (data.reply) {
-            setChatMessages([{ sender: 'ai', content: data.reply, options: data.options }]);
+            const newGreeting = { sender: 'ai', content: data.reply, options: data.options };
+            setChatMessages([newGreeting as any]);
+            greetingCache.set(cacheKey, newGreeting); // Save to local cache
           } else if (data.error) {
             setChatMessages([{ sender: 'ai', content: `⚠️ Error: ${data.error}` }]);
           }
