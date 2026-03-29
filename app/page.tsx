@@ -8,6 +8,13 @@ import { SummaryScreen } from "@/components/screens/summary-screen"
 import { ArrowLeft, ArrowRight, Check } from "lucide-react"
 import { cn } from "@/lib/utils"
 
+export type SelectedFeature = {
+  id: string
+  title: string
+  titleMl: string
+  icon: string
+}
+
 type Screen = "landing" | "style" | "requirements" | "summary"
 
 export default function Home() {
@@ -17,8 +24,10 @@ export default function Home() {
   const [requirementsNotes, setRequirementsNotes] = useState("")
   const [selectedStyles, setSelectedStyles] = useState<string[]>([])
   const [bhk, setBhk] = useState(3)
-  const [selectedFeatures, setSelectedFeatures] = useState<string[]>([])
+  const [selectedFeatures, setSelectedFeatures] = useState<SelectedFeature[]>([])
+  const [houseType, setHouseType] = useState<"single" | "double">("double")
   const [budgetRange, setBudgetRange] = useState<[number, number]>([50, 150])
+  const [sqftRange, setSqftRange] = useState<[number, number]>([1500, 3000])
   const [submitted, setSubmitted] = useState(false)
 
   const handleLanguageToggle = (lang: "en" | "ml") => {
@@ -37,10 +46,10 @@ export default function Home() {
     })
   }
 
-  const handleFeatureToggle = (feature: string) => {
+  const handleFeatureToggle = (feature: SelectedFeature) => {
     setSelectedFeatures((prev) =>
-      prev.includes(feature)
-        ? prev.filter((f) => f !== feature)
+      prev.some((f) => f.id === feature.id)
+        ? prev.filter((f) => f.id !== feature.id)
         : [...prev, feature]
     )
   }
@@ -100,6 +109,8 @@ export default function Home() {
               setBhk(3)
               setSelectedFeatures([])
               setBudgetRange([50, 150])
+              setSqftRange([1500, 3000])
+              setHouseType("double")
             }}
             className="mt-8 text-sm text-primary underline underline-offset-4 hover:text-primary/80 transition-colors"
           >
@@ -178,23 +189,32 @@ export default function Home() {
         {currentScreen === "requirements" && (
           <RequirementsScreen
             language={language}
+            houseType={houseType}
+            onHouseTypeChange={setHouseType}
             bhk={bhk}
             onBhkChange={setBhk}
             selectedFeatures={selectedFeatures}
             onFeatureToggle={handleFeatureToggle}
             budgetRange={budgetRange}
             onBudgetChange={setBudgetRange}
+            sqftRange={sqftRange}
+            onSqftChange={setSqftRange}
             additionalNotes={requirementsNotes}
             onNotesChange={setRequirementsNotes}
+            selectedStyles={selectedStyles}
+            styleNotes={additionalNotes}
           />
         )}
         {currentScreen === "summary" && (
           <SummaryScreen
             language={language}
             styles={selectedStyles}
+            houseType={houseType}
             bhk={bhk}
             features={selectedFeatures}
             budgetRange={budgetRange}
+            sqftRange={sqftRange}
+            notes={requirementsNotes}
             onSubmit={handleSubmit}
           />
         )}

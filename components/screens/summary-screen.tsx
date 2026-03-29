@@ -1,13 +1,28 @@
 "use client"
 
-import { Check, Shield, Bed, Home, Car, Flower2, Palette, IndianRupee, Bath, BookOpen, Laptop, Tv, Utensils, Armchair, DoorOpen, Package, Sprout, Flame, Coffee, Archive, Umbrella, Dumbbell, Droplet, CloudRain, Zap, Recycle, Warehouse, Trees } from "lucide-react"
+import { useState, useEffect } from "react"
+import { Check, Shield, Bed, Home, Palette, IndianRupee, FileText, Download, Sprout, Ruler, Layers, Map } from "lucide-react"
+import * as LucideIcons from "lucide-react"
+import { generateArchitectSummary } from "./chat"
+import { Skeleton } from "@/components/ui/skeleton"
+import { jsPDF } from "jspdf"
+
+export type SelectedFeature = {
+  id: string;
+  title: string;
+  titleMl: string;
+  icon: string;
+};
 
 interface SummaryScreenProps {
   language: "en" | "ml"
   styles: string[]
+  houseType: "single" | "double"
   bhk: number
-  features: string[]
+  features: SelectedFeature[]
   budgetRange: [number, number]
+  sqftRange: [number, number]
+  notes: string
   onSubmit: () => void
 }
 
@@ -16,32 +31,6 @@ const styleLabels: Record<string, { en: string; ml: string }> = {
   modern: { en: "Modern Minimalist", ml: "ആധുനിക മിനിമലിസ്റ്റ്" },
   fusion: { en: "Contemporary Fusion", ml: "സമകാലിക ഫ്യൂഷൻ" },
   tropical: { en: "Tropical Resort", ml: "ട്രോപ്പിക്കൽ റിസോർട്ട്" },
-}
-
-const featureLabels: Record<string, { en: string; ml: string; icon: typeof Home }> = {
-  pooja: { en: "Pooja Room", ml: "പൂജാമുറി", icon: Flower2 },
-  prayer: { en: "Prayer Hall", ml: "പ്രെയർ ഹാൾ", icon: BookOpen },
-  nadumuttam: { en: "Nadumuttam", ml: "നടുമുറ്റം", icon: Home },
-  carporch: { en: "Car Porch", ml: "കാർ പോർച്ച്", icon: Car },
-  attachedbath: { en: "Attached Bath", ml: "അറ്റാച്ച്ഡ് ബാത്ത്", icon: Bath },
-  study: { en: "Study Room", ml: "സ്റ്റഡി റൂം", icon: Laptop },
-  theater: { en: "Home Theater", ml: "ഹോം തിയേറ്റർ", icon: Tv },
-  workarea: { en: "Work Area", ml: "വർക്ക് ഏരിയ", icon: Utensils },
-  balcony: { en: "Balcony", ml: "ബാൽക്കണി", icon: Armchair },
-  padippura: { en: "Padippura", ml: "പടിപ്പുര", icon: DoorOpen },
-  aatukattil: { en: "Aatu Kattil", ml: "ആട്ടുകട്ടിൽ", icon: Armchair },
-  charupady: { en: "Charupady", ml: "ചാരുപടി", icon: Armchair },
-  pathayappura: { en: "Pathayappura", ml: "പത്തായപ്പുര", icon: Warehouse },
-  sarpakavu: { en: "Sacred Grove", ml: "സർപ്പക്കാവ്", icon: Trees },
-  smokekitchen: { en: "Smoke Kitchen", ml: "വിറക് അടുക്കള", icon: Flame },
-  pantry: { en: "Pantry", ml: "പാൻട്രി", icon: Coffee },
-  storeroom: { en: "Store Room", ml: "സ്റ്റോർ റൂം", icon: Archive },
-  outdoordeck: { en: "Outdoor Deck", ml: "ഔട്ട്ഡോർ ഡെക്ക്", icon: Umbrella },
-  gym: { en: "Gym / Yoga", ml: "ജിം / യോഗ", icon: Dumbbell },
-  well: { en: "Well", ml: "കിണർ", icon: Droplet },
-  rainwater: { en: "Rainwater Harvest", ml: "മഴവെള്ള സംഭരണി", icon: CloudRain },
-  solar: { en: "Solar Provisions", ml: "സോളാർ", icon: Zap },
-  greywater: { en: "Greywater Recycle", ml: "ജല പുനരുപയോഗം", icon: Recycle },
 }
 
 function formatBudget(value: number): string {
@@ -54,11 +43,93 @@ function formatBudget(value: number): string {
 export function SummaryScreen({
   language,
   styles,
+  houseType,
   bhk,
   features,
   budgetRange,
+  sqftRange,
+  notes,
   onSubmit,
 }: SummaryScreenProps) {
+  const [architectBrief, setArchitectBrief] = useState<string>("")
+  const [isLoadingBrief, setIsLoadingBrief] = useState(true)
+  const [dxfPlan, setDxfPlan] = useState<string>("")
+  const [projectRef] = useState(`KL-${new Date().getFullYear()}-${Math.random().toString(36).substring(2, 8).toUpperCase()}`)
+
+  useEffect(() => {
+    async function fetchBrief() {
+      setIsLoadingBrief(true)
+      const featureTitles = features.map(f => f.title)
+      const res = await generateArchitectSummary({ styles, houseType, bhk, sqftRange, features: featureTitles, budgetRange, notes }, language)
+      if (res.brief) {
+        setArchitectBrief(res.brief);
+        setDxfPlan(res.dxfPlan || "");
+      } else {
+        const errorMsg = language === "en" ? "Failed to generate brief." : "സംഗ്രഹം സൃഷ്ടിക്കാൻ കഴിഞ്ഞില്ല.";
+        setArchitectBrief(errorMsg);
+      }
+      setIsLoadingBrief(false)
+    }
+    fetchBrief()
+  }, [styles, houseType, bhk, sqftRange, features, budgetRange, notes, language])
+
+  const handleDownload = () => {
+    const doc = new jsPDF();
+    
+    // Add a Formal Document Header
+    doc.setFontSize(18);
+    doc.text("Senior Architect Requirement Analysis", 15, 20);
+    
+    doc.setFontSize(11);
+    doc.text(`Project Reference: ${projectRef}`, 15, 30);
+    doc.text(`Architecture Style: ${styles.length > 0 ? styles.map((s) => styleLabels[s]?.["en"] || s).join(", ") : "Not specified"}`, 15, 37);
+    doc.text(`Property Type: ${houseType === "single" ? "Single Story" : "Double Story"}`, 15, 44);
+    doc.text(`Bedrooms: ${bhk} BHK`, 15, 51);
+    doc.text(`Area: ${sqftRange[0]} - ${sqftRange[1] >= 10000 ? "10,000+" : sqftRange[1]} Sq.Ft`, 15, 58);
+    doc.text(`Budget Range: ${formatBudget(budgetRange[0])} - ${formatBudget(budgetRange[1])}`, 15, 65);
+    
+    doc.text("Selected Features:", 15, 75);
+    const featureTexts = features.length > 0 ? features.map(f => f.title).join(", ") : "None";
+    const splitFeatures = doc.splitTextToSize(featureTexts, 180);
+    doc.text(splitFeatures, 15, 82);
+
+    const dividerY = 82 + (splitFeatures.length * 5);
+    doc.line(15, dividerY, 195, dividerY); // Divider line
+    
+    let nextY = dividerY + 10;
+    const pageHeight = 297; // Standard A4 portrait height in mm
+    const margin = 20;
+    const lineHeight = 5.5; // Safe, fixed line height to ensure proper pagination
+
+    // Append the AI generated brief text
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(10);
+    
+    const cleanBrief = architectBrief.replace(/\r\n/g, '\n');
+    const splitText = doc.splitTextToSize(cleanBrief, 180);
+
+    for (const line of splitText) {
+      if (nextY + lineHeight > pageHeight - margin) {
+        doc.addPage();
+        nextY = margin;
+      }
+      doc.text(line, 15, nextY);
+      nextY += lineHeight;
+    }
+
+    doc.save(`Requirement_Analysis_${projectRef}.pdf`);
+  }
+
+  const handleCadDownload = () => {
+    const element = document.createElement("a");
+    const file = new Blob([dxfPlan], {type: 'application/dxf'});
+    element.href = URL.createObjectURL(file);
+    element.download = `Conceptual_Plan_${projectRef}.dxf`;
+    document.body.appendChild(element);
+    element.click();
+    document.body.removeChild(element);
+  }
+
   return (
     <div className="min-h-screen bg-background px-5 py-8 flex flex-col">
       <div className="max-w-md mx-auto flex-1 w-full">
@@ -100,6 +171,24 @@ export function SummaryScreen({
               <Check className="w-5 h-5 text-accent shrink-0" />
             </div>
 
+            {/* House Type */}
+            <div className="flex items-start gap-4">
+              <div className="w-10 h-10 border border-border rounded-full flex items-center justify-center shrink-0">
+                <Layers className="w-5 h-5 text-primary" />
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="text-xs text-muted-foreground mb-0.5">
+                  {language === "en" ? "Property Type" : "കെട്ടിടത്തിന്റെ തരം"}
+                </p>
+                <p className="text-foreground font-medium">
+                  {houseType === "single" 
+                    ? (language === "en" ? "Single Story" : "സിംഗിൾ സ്റ്റോറി")
+                    : (language === "en" ? "Double Story" : "ഡബിൾ സ്റ്റോറി")}
+                </p>
+              </div>
+              <Check className="w-5 h-5 text-accent shrink-0" />
+            </div>
+
             {/* BHK */}
             <div className="flex items-start gap-4">
               <div className="w-10 h-10 border border-border rounded-full flex items-center justify-center shrink-0">
@@ -110,6 +199,22 @@ export function SummaryScreen({
                   {language === "en" ? "Bedrooms" : "കിടപ്പുമുറികൾ"}
                 </p>
                 <p className="text-foreground font-medium">{bhk} BHK</p>
+              </div>
+              <Check className="w-5 h-5 text-accent shrink-0" />
+            </div>
+
+            {/* Area SqFt */}
+            <div className="flex items-start gap-4">
+              <div className="w-10 h-10 border border-border rounded-full flex items-center justify-center shrink-0">
+                <Ruler className="w-5 h-5 text-primary" />
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="text-xs text-muted-foreground mb-0.5">
+                  {language === "en" ? "Area (Sq.Ft)" : "വിസ്തീർണ്ണം (Sq.Ft)"}
+                </p>
+                <p className="text-foreground font-medium">
+                  {sqftRange[0]} - {sqftRange[1] >= 10000 ? "10,000+" : sqftRange[1]}
+                </p>
               </div>
               <Check className="w-5 h-5 text-accent shrink-0" />
             </div>
@@ -126,13 +231,14 @@ export function SummaryScreen({
                 {features.length > 0 ? (
                   <div className="flex flex-wrap gap-2">
                     {features.map((feat) => {
-                      const label = featureLabels[feat]
+                      const Icon = (LucideIcons as any)[feat.icon] || Sprout
                       return (
                         <span
-                          key={feat}
-                          className="inline-flex items-center gap-1 text-xs bg-secondary text-secondary-foreground px-2 py-1"
+                          key={feat.id}
+                          className="inline-flex items-center gap-1.5 text-xs bg-secondary text-secondary-foreground px-2.5 py-1.5 rounded-sm"
                         >
-                          {label?.[language] || feat}
+                          <Icon className="w-3.5 h-3.5" />
+                          {language === "en" ? feat.title : feat.titleMl}
                         </span>
                       )
                     })}
@@ -172,10 +278,62 @@ export function SummaryScreen({
               {language === "en" ? "Project Reference" : "പ്രോജക്ട് റഫറൻസ്"}
             </p>
             <p className="font-mono text-sm text-foreground tracking-wider">
-              KL-{new Date().getFullYear()}-{Math.random().toString(36).substring(2, 8).toUpperCase()}
+              {projectRef}
             </p>
           </div>
         </div>
+
+        {/* AI Architectural Brief Section */}
+        <div className="border border-border bg-card p-6 mt-6 relative">
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="font-serif text-lg font-medium flex items-center gap-2">
+              <FileText className="w-5 h-5 text-primary" />
+              {language === "en" ? "Architectural Brief" : "ആർക്കിടെക്ചറൽ ബ്രീഫ്"}
+            </h3>
+            {!isLoadingBrief && architectBrief && (
+              <div className="flex items-center gap-4">
+                <button onClick={handleDownload} className="text-xs flex items-center gap-1 text-primary hover:text-primary/80 transition-colors">
+                  <Download className="w-3.5 h-3.5" />
+                  {language === "en" ? "Brief (.pdf)" : "ബ്രീഫ് (.pdf)"}
+                </button>
+              </div>
+            )}
+          </div>
+          {isLoadingBrief ? (
+            <div className="space-y-3">
+              <Skeleton className="h-4 w-full" />
+              <Skeleton className="h-4 w-[90%]" />
+              <Skeleton className="h-4 w-[80%]" />
+              <Skeleton className="h-4 w-full mt-4" />
+              <Skeleton className="h-4 w-[75%]" />
+            </div>
+          ) : (
+            <>
+              <div className="text-sm text-muted-foreground whitespace-pre-wrap leading-relaxed">
+                {architectBrief}
+              </div>
+            </>
+          )}
+        </div>
+
+        {/* AI CAD Plan Section */}
+        {dxfPlan && !isLoadingBrief && (
+          <div className="border border-border bg-card p-6 mt-6 relative">
+            <div className="flex flex-col items-center justify-center text-center p-4 border-2 border-dashed border-border rounded-md">
+              <Map className="w-8 h-8 text-primary mb-3" />
+              <h3 className="font-serif text-lg font-medium mb-1">
+                {language === "en" ? "Conceptual CAD Plan Generated" : "കൺസെപ്ച്വൽ CAD പ്ലാൻ തയ്യാറാണ്"}
+              </h3>
+              <p className="text-xs text-muted-foreground mb-4">
+                {language === "en" ? "A basic DXF file has been generated for your architect." : "നിങ്ങളുടെ ആർക്കിടെക്റ്റിനായി ഒരു അടിസ്ഥാന DXF ഫയൽ സൃഷ്ടിച്ചു."}
+              </p>
+              <button onClick={handleCadDownload} className="text-sm bg-primary text-primary-foreground px-4 py-2 rounded-md flex items-center gap-2 hover:bg-primary/90 transition-colors">
+                <Download className="w-4 h-4" />
+                {language === "en" ? "Download CAD (.dxf)" : "CAD ഡൗൺലോഡ് ചെയ്യുക (.dxf)"}
+              </button>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Fixed Bottom Button */}
